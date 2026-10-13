@@ -1,0 +1,33 @@
+Pathfinder - third-party components
+===================================
+
+Pathfinder code in the beiroun/pathfinder, pathfinder-server and
+pathfinder-console repositories is licensed under the Business Source License
+1.1 (see LICENSE). It builds on and ships alongside third-party software that
+keeps its own license. Nothing in the Pathfinder license changes the terms
+under which these components are provided.
+
+Component                Used in              License (verify against the pinned version)
+-----------------------  -------------------  -----------------------------------------------
+PostgreSQL               deployment           PostgreSQL License
+Caddy                    deployment (edge)    Apache-2.0
+nginx                    pathfinder-console   BSD-2-Clause
+Debian (base image)      all images           various (Debian Free Software Guidelines)
+Eclipse Temurin JRE      pathfinder-server    GPL-2.0 with Classpath Exception
+Kotlin                   pathfinder-server    Apache-2.0
+Spring Boot / Security   pathfinder-server    Apache-2.0
+Flyway (community)       pathfinder-server    Apache-2.0
+JJWT                     pathfinder-server    Apache-2.0
+ZXing                    pathfinder-server    Apache-2.0
+Yauaa                    pathfinder-server    Apache-2.0
+Node.js (build)          pathfinder-console   MIT
+TypeScript               pathfinder-console   Apache-2.0
+React                    pathfinder-console   MIT
+Vite                     pathfinder-console   MIT
+React Router             pathfinder-console   MIT
+Axios                    pathfinder-console   MIT
+Inter (font)             pathfinder-console   SIL Open Font License 1.1
+
+The Pathfinder images only package these components; their source code and
+licenses are available from the respective upstream projects. The exact
+versions are pinned in each component repository (Dockerfile, build files).

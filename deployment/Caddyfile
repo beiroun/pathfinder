@@ -1,0 +1,53 @@
+# SPDX-License-Identifier: BUSL-1.1
+# Copyright (c) 2026 Andrei Baranov (84softworks). Licensed under the Business Source License 1.1 - see LICENSE.
+# Pathfinder - edge proxy: public names, TLS, HTTP->HTTPS
+# ======================================================
+# The only container that faces the internet on 80/443. Everything behind it listens on loopback, so this file
+# is the single place where a public name is mapped to a service.
+#
+# Certificates: obtained and renewed automatically (ACME HTTP-01 on port 80) and stored in the mounted data
+# directory. Nothing TLS-related is ever written into this repository - the private keys exist only on the host.
+#
+# Host names come from .env (parse-time substitution, which is what Caddy allows in a site address); this file
+# stays site-agnostic and committed. A name must resolve to this host BEFORE the first start, otherwise the
+# ACME challenge fails and Caddy retries with a backoff.
+
+{
+	# Expiry notices from the CA; also the ACME account identity
+	email {$PF_ACME_EMAIL}
+}
+
+# Shared hardening for both names. HSTS is set by Caddy itself on an HTTPS site.
+(hardening) {
+	header {
+		X-Content-Type-Options nosniff
+		Referrer-Policy no-referrer
+		-Server
+	}
+}
+
+# The server: the public redirect of every printed code (/r/<slug>) and the API. The console's nginx proxies
+# /api to the same process over loopback, so a browser on the console's name never comes here.
+{$PF_SERVER_HOST} {
+	import hardening
+	# A person who types the bare name gets the console; the QR codes never point here
+	@root path /
+	redir @root https://{$PF_CONSOLE_HOST}
+	# Actuator stays on loopback except the liveness answer an uptime monitor may ask for
+	@internal {
+		path /system/*
+		not path /system/health
+	}
+	respond @internal 404
+	reverse_proxy 127.0.0.1:8080
+}
+
+# The management console: the SPA and, under /api, the server it proxies to - one origin, so the browser needs no CORS
+{$PF_CONSOLE_HOST} {
+	import hardening
+	header {
+		# The console is never meant to be embedded anywhere
+		X-Frame-Options DENY
+	}
+	reverse_proxy 127.0.0.1:8081
+}

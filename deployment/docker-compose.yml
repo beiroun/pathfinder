@@ -1,0 +1,117 @@
+# SPDX-License-Identifier: BUSL-1.1
+# Copyright (c) 2026 Andrei Baranov (84softworks). Licensed under the Business Source License 1.1 - see LICENSE.
+# Pathfinder - the whole system on one host
+# =========================================
+# This directory is the only thing that lives on the server: this file, the Caddyfile and .env (from .env.example).
+# No component sources, no builds on the host - every service is a published image, pinned to the version it was
+# tested with. Updating a component = bump its tag here -> commit -> on the server `git pull && docker compose
+# pull && docker compose up -d` (or deployment/push.sh from the laptop, see RUNBOOK.md).
+#
+# Secrets never enter this repository: passwords and host names live in .env, TLS private keys are written by
+# the edge proxy into ./edge-data on the host. Both are gitignored; this file only names them.
+#
+# Every service runs with network_mode: host: one host, no bridge NAT, 127.0.0.1 means the same thing for all of
+# them. Only HTTP(S) faces the internet, through the edge; the database, the server and the console's nginx
+# listen on loopback.
+#
+# Firewall: TCP 80 + 443 (edge; 80 is required even for an HTTPS-only site - the ACME challenge and the redirect
+# to HTTPS both use it).
+
+# Pinned project name. Without it Compose takes the directory name ("deployment"), and the database volume is
+# named after it: a checkout under another directory name would start Postgres on a new, empty volume.
+name: pathfinder
+
+services:
+  postgres:
+    image: postgres:18
+    container_name: pathfinder-postgres
+    network_mode: host
+    # Host networking: the database is for the server on this host only, so bind to loopback
+    command: ["postgres", "-c", "listen_addresses=127.0.0.1"]
+    environment:
+      POSTGRES_DB: pathfinder
+      POSTGRES_USER: pathfinder              # schema owner; the server runs Flyway as it
+      POSTGRES_PASSWORD: "${PF_DB_PASSWORD:?set PF_DB_PASSWORD in deployment/.env}"
+      TZ: "${PF_TZ:-UTC}"
+    volumes:
+      # postgres:18 keeps PGDATA at /var/lib/postgresql/18/docker; the parent is what the image declares as the volume
+      - postgres-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U pathfinder -d pathfinder"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+    restart: always
+
+  server:
+    image: ghcr.io/beiroun/pathfinder-server:0.1.0
+    container_name: pathfinder-server
+    network_mode: host
+    environment:
+      PF_DB_URL: "jdbc:postgresql://127.0.0.1:5432/pathfinder"
+      PF_DB_USER: "pathfinder"
+      PF_DB_PASSWORD: "${PF_DB_PASSWORD:?set PF_DB_PASSWORD in deployment/.env}"
+      PF_SERVER_BIND: "127.0.0.1"            # reached by the console's nginx (/api) and by the edge proxy
+      PF_SERVER_PORT: "8080"
+      # Printed into every QR code: the server's public name. A printed code outlives any deployment.
+      PF_PUBLIC_BASE_URL: "https://${PF_SERVER_HOST:?set PF_SERVER_HOST in deployment/.env}"
+      # Browser origins allowed to call the API cross-site. The console is same-origin through its own nginx,
+      # so this is only for a console served from another name. Empty = no cross-site browser access.
+      PF_CORS_ORIGINS: "${PF_CORS_ORIGINS:-}"
+      PF_LOG_LEVEL: "${PF_LOG_LEVEL:-INFO}"
+      # Console access: token signing key and the users (an empty secret or admin list refuses to start)
+      PF_JWT_SECRET: "${PF_JWT_SECRET:?set PF_JWT_SECRET in deployment/.env}"
+      PF_ADMIN_USERS: "${PF_ADMIN_USERS:?set PF_ADMIN_USERS in deployment/.env}"
+      PF_VIEWER_USERS: "${PF_VIEWER_USERS:-}"
+      PF_ACCESS_TOKEN_TTL: "${PF_ACCESS_TOKEN_TTL:-PT15M}"
+      PF_REFRESH_TOKEN_TTL: "${PF_REFRESH_TOKEN_TTL:-P7D}"
+      TZ: "${PF_TZ:-UTC}"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: always
+
+  console:
+    image: ghcr.io/beiroun/pathfinder-console:0.1.0
+    container_name: pathfinder-console
+    network_mode: host                       # nginx on 127.0.0.1:8081 behind the edge, proxies /api to 127.0.0.1:8080
+    environment:
+      TZ: "${PF_TZ:-UTC}"
+    depends_on:
+      - server
+    restart: always
+
+  edge:
+    # Caddy obtains and renews the certificates itself (ACME HTTP-01) - no certbot, no cron, no reload hook.
+    image: caddy:2.11.7
+    container_name: pathfinder-edge
+    network_mode: host
+    # A fixed non-root uid so the certificate store on the host belongs to a known owner (the runbook creates it)
+    user: "1001:1001"
+    cap_add:
+      # The image's binary carries cap_net_bind_service, but a non-root uid still has to be granted it to
+      # listen on 80 and 443.
+      - NET_BIND_SERVICE
+    environment:
+      # Site names; the Caddyfile substitutes them into its site addresses at parse time
+      PF_SERVER_HOST: "${PF_SERVER_HOST:?set PF_SERVER_HOST in deployment/.env}"
+      PF_CONSOLE_HOST: "${PF_CONSOLE_HOST:?set PF_CONSOLE_HOST in deployment/.env}"
+      PF_ACME_EMAIL: "${PF_ACME_EMAIL:?set PF_ACME_EMAIL in deployment/.env}"
+      # Keeps Caddy's autosaved config inside the same mounted directory, so the container needs one writable
+      # path and not two
+      XDG_CONFIG_HOME: "/data/config"
+      TZ: "${PF_TZ:-UTC}"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # Certificates, keys and the ACME account. A bind mount on purpose: the directory is created and chowned
+      # to 1001 by the runbook before the first start, which a named volume cannot express. Without host path
+      # creation a missing directory fails `up` at once instead of becoming an empty root-owned one.
+      - type: bind
+        source: ./edge-data
+        target: /data
+        bind:
+          create_host_path: false
+    restart: always
+
+volumes:
+  postgres-data:

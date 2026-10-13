@@ -1,0 +1,42 @@
+# secrets / site-local config - NEVER commit (repo is meant to go public)
+deployment/.env
+# where deployment/push.sh sends the files: the host's address and ssh port (template: deployment/.deploy.env.example)
+deployment/.deploy.env
+.deploy.env
+.env
+.env.local
+
+# site-local operational scripts: real ports and addresses of one host, kept out of a public repo
+deployment/private/
+private/
+# credentials / TLS material
+*.pem
+*.key
+*.crt
+*.p12
+*.jks
+# the edge proxy's certificate store and ACME account (deployment/edge-data) - private keys, never committed
+edge-data/
+
+# intellij
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# logs
+*.log
+logs/
+*.pid
+*.seed
+
+# tmp
+*.swp
+*.tmp
+*.bak
+*.orig
+*.back
+
+# OS
+.DS_Store
+Thumbs.db
