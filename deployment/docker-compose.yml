@@ -44,7 +44,7 @@ services:
     restart: always
 
   server:
-    image: ghcr.io/beiroun/pathfinder-server:0.1.0
+    image: ghcr.io/beiroun/pathfinder-server:0.1.1
     container_name: pathfinder-server
     network_mode: host
     environment:
