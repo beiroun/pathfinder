@@ -23,7 +23,10 @@ name: pathfinder
 
 services:
   postgres:
-    image: postgres:18
+    # Every external image is pinned by exact tag and digest (rule of 2026-10-22): a floating tag pulls whatever it
+    # means that day. A bump is a deliberate change of both, after checking that the tag resolves and the digest
+    # downloads (RUNBOOK, "Pinned versions")
+    image: postgres:18.6-trixie@sha256:edb0c08dc33befd0262ab3b5cf1c4f3f8cfd8b09e88c05b45adee29d6761ddb6
     container_name: pathfinder-postgres
     network_mode: host
     # Host networking: the database is for the server on this host only, so bind to loopback
@@ -44,7 +47,7 @@ services:
     restart: always
 
   server:
-    image: ghcr.io/beiroun/pathfinder-server:0.1.1
+    image: ghcr.io/beiroun/pathfinder-server:0.1.2
     container_name: pathfinder-server
     network_mode: host
     environment:
@@ -72,7 +75,7 @@ services:
     restart: always
 
   console:
-    image: ghcr.io/beiroun/pathfinder-console:0.1.0
+    image: ghcr.io/beiroun/pathfinder-console:0.1.1
     container_name: pathfinder-console
     network_mode: host                       # nginx on 127.0.0.1:8081 behind the edge, proxies /api to 127.0.0.1:8080
     environment:
@@ -83,7 +86,7 @@ services:
 
   edge:
     # Caddy obtains and renews the certificates itself (ACME HTTP-01) - no certbot, no cron, no reload hook.
-    image: caddy:2.11.7
+    image: caddy:2.11.7@sha256:3095ad245c353e3bdb27a38f22a095c1cfa9e295ab21c0214c3e72b0e2960525
     container_name: pathfinder-edge
     network_mode: host
     # A fixed non-root uid so the certificate store on the host belongs to a known owner (the runbook creates it)

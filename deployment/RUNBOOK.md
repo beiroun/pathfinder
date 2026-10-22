@@ -121,6 +121,28 @@ When `pathfinder.service` is among the sent files the unit is re-rendered with t
 `systemctl daemon-reload` runs, as in "System service". The files still go through git as before - the script
 only replaces the `git pull` on the host with an upload of what is on the laptop, committed or not.
 
+## Pinned versions
+
+Nothing runs or builds from a floating version (rule of 2026-10-22). Every external input is pinned exactly, and a
+bump is a deliberate change of the pin:
+
+| Where | Pin |
+|---|---|
+| this compose | `postgres:18.6-trixie@sha256:edb0c08d…` (PostgreSQL 18.6-1.pgdg13+2), `caddy:2.11.7@sha256:3095ad24…`; own images by exact `X.Y.Z` |
+| server image | Dockerfile frontend `docker/dockerfile:1.28.0@sha256:…`, `eclipse-temurin:25.0.4.1_1-jdk-noble` / `-jre-noble` by digest, Gradle `9.8.0` with `distributionSha256Sum`, libraries by exact version (Spring Boot BOM) |
+| console image | the same frontend, `node:24.22.1-trixie-slim`, `nginx:1.30.6-trixie` by digest, npm packages from `package-lock.json` (`npm ci`) |
+| CI | GitHub Actions by commit SHA (version in a comment), buildx `v0.38.1`, BuildKit `moby/buildkit:v0.34.1@sha256:…`, runner `ubuntu-24.04` |
+
+A digest is pinned next to the tag (`image:tag@sha256:…`): the tag says what it is, the digest makes it immutable
+- Docker pulls by the digest. It is the multi-platform index, so the same line works on an amd64 host and an arm64
+laptop. Tags are not immutable on Docker Hub: `caddy:2.11.7` was rebuilt on 2026-10-21, a week after this file
+first named it.
+
+Bumping a pin: pick the exact new version, check **before** writing it down that it resolves and downloads
+(registry API: tag -> index digest -> linux/amd64 manifest -> every layer blob answers; `git ls-remote` for an
+action's tag), write tag and digest together, let CI build it, then update. A database bump is its own event: a
+minor of the same major is a restart, a new major needs `pg_upgrade` or a dump.
+
 ## Rollback
 
 Revert the tag in `docker-compose.yml` (or `git revert` the bump), `git pull` on the server,
