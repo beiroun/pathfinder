@@ -26,7 +26,10 @@ React                    pathfinder-console   MIT
 Vite                     pathfinder-console   MIT
 React Router             pathfinder-console   MIT
 Axios                    pathfinder-console   MIT
-Inter (font)             pathfinder-console   SIL Open Font License 1.1
+Mantine                  pathfinder-console   MIT
+Tabler Icons             pathfinder-console   MIT
+Onest (font)             pathfinder-console   SIL Open Font License 1.1
+Clash Display (font)     pathfinder-console   ITF Free Font License (Fontshare)
 
 The Pathfinder images only package these components; their source code and
 licenses are available from the respective upstream projects. The exact
