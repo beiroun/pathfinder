@@ -75,7 +75,7 @@ services:
     restart: always
 
   console:
-    image: ghcr.io/beiroun/pathfinder-console:0.1.1
+    image: ghcr.io/beiroun/pathfinder-console:0.2.0
     container_name: pathfinder-console
     network_mode: host                       # nginx on 127.0.0.1:8081 behind the edge, proxies /api to 127.0.0.1:8080
     environment:
