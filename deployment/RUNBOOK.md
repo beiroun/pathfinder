@@ -84,6 +84,43 @@ After any change of a name in `.env`: `docker compose up -d edge`, then
 fails the challenge; Caddy then retries with a growing backoff, so fix the DNS record and
 `docker compose restart edge` instead of waiting.
 
+## Next to another product (shared edge)
+
+Pathfinder can live on a host that already runs another product with its own edge proxy on 80/443 - ThunderVox
+(umbrella v0.19 and later, whose edge imports `deploy/sites/*.caddy`). Then Pathfinder runs no edge: its two
+names are served by the neighbour's Caddy, and its loopback ports move off the neighbour's.
+
+| | standalone | shared edge |
+|---|---|---|
+| compose files | `docker-compose.yml` | `+ docker-compose.shared-edge.yml` (`COMPOSE_FILE` in `.env`) |
+| PostgreSQL | 127.0.0.1:5432 | 127.0.0.1:5433 |
+| server | 127.0.0.1:8080 | 127.0.0.1:8090 |
+| console nginx | 127.0.0.1:8081 | 127.0.0.1:8091 (`console-shared-edge.conf`) |
+| edge, certificates | `pathfinder-edge`, `edge-data/` here | the neighbour's edge and its `edge-data/` |
+
+From the laptop, once and after every change of these files:
+
+```bash
+# deployment/.env:        COMPOSE_FILE=docker-compose.yml:docker-compose.shared-edge.yml (PF_ACME_EMAIL still set)
+# deployment/.deploy.env: PF_DEPLOY_TARGET / _PORT / _KEY of the neighbour's host, PF_DEPLOY_DIR for Pathfinder,
+#                         PF_SHARED_EDGE_CONTAINER=thundervox-edge
+deployment/cohost.sh --dry-run      # what it will check, send and run
+deployment/cohost.sh
+```
+
+The script checks the host first and changes nothing when it cannot take Pathfinder (no docker, the neighbour's
+edge without the sites mount or the import, a port taken by someone else). Then it sends the files (`.env`
+included, the old one kept as `.env.prev`), installs and starts or reloads `pathfinder.service`, waits for the
+server on loopback, renders `shared-edge.caddy` with the names from `.env` into the neighbour's
+`sites/pathfinder.caddy`, validates the neighbour's whole config and reloads its edge - or puts the previous file
+back when the config does not validate, so the neighbour is never left with a broken edge. `deployment/push.sh`
+keeps working for updates of `docker-compose.yml` afterwards; the host's `.env` keeps selecting the shared edge.
+
+**Behind Cloudflare** (proxied records, default settings - the same as ThunderVox's names): nothing to set up. In
+Full mode Cloudflare forwards a plain-HTTP request to the origin over plain HTTP, so the ACME challenge on port 80
+reaches the shared edge, which answers it; the HTTP->HTTPS redirect on every other path is Caddy's own (308).
+Until the edge serves a name, Cloudflare reports 525 for it - the edge does not know the name yet.
+
 ## Updating a component
 
 1. Bump the image tag of the service in `docker-compose.yml` (component repositories publish

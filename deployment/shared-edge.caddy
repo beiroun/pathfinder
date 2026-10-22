@@ -1,0 +1,41 @@
+# SPDX-License-Identifier: BUSL-1.1
+# Copyright (c) 2026 Andrei Baranov (84softworks). Licensed under the Business Source License 1.1 - see LICENSE.
+# Pathfinder site blocks for a shared edge (template)
+# ===================================================
+# cohost.sh renders this file on the host - __PF_SERVER_HOST__ and __PF_CONSOLE_HOST__ become the names from .env -
+# and drops it into the neighbour's sites directory as pathfinder.caddy. Literal names, not {$PF_...}: the
+# neighbour's edge container does not carry Pathfinder's environment. The same routing as Caddyfile, on the
+# shared-edge ports (docker-compose.shared-edge.yml). Snippet names are global in a Caddyfile, hence the prefix.
+
+(pathfinder_hardening) {
+	header {
+		X-Content-Type-Options nosniff
+		Referrer-Policy no-referrer
+		-Server
+	}
+}
+
+# The server: the public redirect of every printed code (/r/<slug>) and the API
+__PF_SERVER_HOST__ {
+	import pathfinder_hardening
+	# A person who types the bare name gets the console; the QR codes never point here
+	@root path /
+	redir @root https://__PF_CONSOLE_HOST__
+	# Actuator stays on loopback except the liveness answer an uptime monitor may ask for
+	@internal {
+		path /system/*
+		not path /system/health
+	}
+	respond @internal 404
+	reverse_proxy 127.0.0.1:8090
+}
+
+# The management console: the SPA and, under /api, the server it proxies to - one origin, no CORS
+__PF_CONSOLE_HOST__ {
+	import pathfinder_hardening
+	header {
+		# The console is never meant to be embedded anywhere
+		X-Frame-Options DENY
+	}
+	reverse_proxy 127.0.0.1:8091
+}
