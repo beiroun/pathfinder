@@ -15,8 +15,8 @@ deployment of the whole system. Code lives in the component repositories below.
 
 | Repository | Role | Image |
 |---|---|---|
-| [`pathfinder-server`](https://github.com/beiroun/pathfinder-server) | The public redirect (`/r/<slug>`), platform detection by User-Agent, scan counters, QR image rendering, the management API with console logins | `ghcr.io/beiroun/pathfinder-server` |
-| [`pathfinder-console`](https://github.com/beiroun/pathfinder-console) | Management console: create and edit codes, preview and download the image (PNG / SVG), copy the public link, read the per-platform statistics | `ghcr.io/beiroun/pathfinder-console` |
+| [`pathfinder-server`](https://github.com/beiroun/pathfinder-server) | The public redirect (`/r/<slug>`), platform detection by User-Agent, scan counters and a journal of every scan, the statistics API, QR image rendering, the management API with console logins | `ghcr.io/beiroun/pathfinder-server` |
+| [`pathfinder-console`](https://github.com/beiroun/pathfinder-console) | Management console: create and edit codes, preview and download the image (PNG / SVG), copy the public link, a statistics dashboard: scans by day, who scans and where they went, by code, by weekday and hour | `ghcr.io/beiroun/pathfinder-console` |
 | `pathfinder` (this repo) | Charter, licensing, `docker-compose` of the whole system, deployment runbook, push script | — |
 
 ## How it fits together

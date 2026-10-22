@@ -205,7 +205,7 @@ docker compose logs --since 10m server | grep "Scan redirected"     # one line p
 ## Backup
 
 What matters on the host: `.env` and the `postgres-data` volume (Docker name `pathfinder_postgres-data`; the
-codes, their targets and the scan counters). `docker compose exec postgres pg_dump -U pathfinder pathfinder >
+codes, their targets, the scan counters and the scan journal). `docker compose exec postgres pg_dump -U pathfinder pathfinder >
 pathfinder-$(date +%F).sql` for a logical dump. Images are reproducible from the registry and need no backup.
 
 `edge-data/` is worth keeping too, though it is not critical: the certificates would be re-issued on a fresh
