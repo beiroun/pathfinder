@@ -52,13 +52,13 @@ deployment of the whole system. Code lives in the component repositories below.
   from pinned sources and publishes it to GHCR on a tagged release
   (`vX.Y.Z` → `ghcr.io/beiroun/<repo>:X.Y.Z`, no `latest`). Only Docker
   Official Images are used as bases.
-- **The host keeps only this repository.** A `docker-compose.yml`, a
-  `Caddyfile` and `.env` — no component sources, no builds on the server.
+- **The application directory keeps only deployment files.** A `docker-compose.yml`,
+  `console.conf` and `.env` – no component sources, no builds on the server.
   Updating a component means bumping an image tag.
 - **One public name per face, one edge.** `pathfinder.<domain>` is the server
   (the address printed into the codes and the API), `pathfinder-console.<domain>`
-  the console. The only container on 80/443 is the edge proxy, which obtains
-  and renews both certificates itself; the console, the API and the database
+  the console. Public routing and certificate automation are operator-managed;
+  the console, the API and the database
   listen on loopback.
 - **One host, Docker Compose, host networking.** The whole system runs on a
   single VPS.
@@ -69,21 +69,22 @@ deployment of the whole system. Code lives in the component repositories below.
 
 ```
 deployment/
-  docker-compose.yml    postgres, server, console, edge - pinned image tags
-  Caddyfile             public names -> loopback services, automatic TLS
-  .env.example          host names, ACME address, database password, console users
-  pathfinder.service    the stack as one systemd unit
-  push.sh               upload the files from the laptop, pull images, reload the service
+  docker-compose.yml    postgres, server, console – no edge proxy or overlay
+  console.conf.example  portable nginx example; the filled-in console.conf is ignored
+  .env.example          host names, database password, console users
+  push.sh               upload application files and validate, without activation
   .deploy.env.example   where push.sh sends the files (the host's address stays out of git)
-  RUNBOOK.md            bring-up, TLS, update, rollback, checks, backup
+  RUNBOOK.md            portable configuration and upload reference
 ```
 
 `docker compose up -d` in `deployment/` runs the whole system. See
 [`deployment/RUNBOOK.md`](deployment/RUNBOOK.md).
 
-Certificates and private keys are written by the edge proxy into
-`deployment/edge-data/` on the host and are never committed: this repository
-contains the names, not the key material.
+Real listeners, existing database volume names, SSH settings and proxy routes
+are site-local and not published. Configure them through ignored `.env`,
+`.deploy.env` and `console.conf`; the examples contain illustrative values only.
+The upload script validates without activation. Use the operator's private
+procedure for deployment, rollback and host lifecycle changes.
 
 ## License
 

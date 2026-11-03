@@ -2,14 +2,12 @@
 # SPDX-License-Identifier: BUSL-1.1
 # Copyright (c) 2026 Andrei Baranov (84softworks). Licensed under the Business Source License 1.1 - see LICENSE.
 #
-# Pushes the deployment files of this directory to the host over sftp and applies them: images are pulled and the
-# system service is reloaded (changed containers are recreated). Run from the laptop; the host needs nothing
-# beyond sshd, docker and the installed pathfinder.service (RUNBOOK.md "System service").
+# Uploads application files and validates Compose without applying the deployment.
+# Units exist only on the host. Image pulls, daemon-reload and service actions are manual.
 #
-#   deployment/push.sh                  send docker-compose.yml, Caddyfile, pathfinder.service; pull; reload
+#   deployment/push.sh                  send docker-compose.yml and console.conf; validate only
 #   deployment/push.sh .env             send one named file instead (any file of this directory)
-#   deployment/push.sh --restart        stop the whole stack and start it again instead of a reload - only when
-#                                       a reload cannot do it (Postgres restarts too)
+#   Site-local files are uploaded only when named explicitly.
 #   deployment/push.sh --dry-run        print what would be sent and run, touch nothing
 #
 # Where the host is and how to log in come from deployment/.deploy.env (gitignored - the real address, port and
@@ -28,13 +26,13 @@ set -euo pipefail
 
 script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
 
-# The deployment directory is the script's own or the nearest parent that holds the compose file and the unit: a
+# The deployment directory is the script's own or the nearest parent with compose and console.conf: a
 # copy (or symlink) of this script kept in deployment/private next to .deploy.env - gitignored, a natural place
 # for the host's address - finds the files one level up instead of failing on its own directory.
 deploy_dir=$script_dir
-while [[ ! -f "$deploy_dir/docker-compose.yml" || ! -f "$deploy_dir/pathfinder.service" ]]; do
+while [[ ! -f "$deploy_dir/docker-compose.yml" || ! -f "$deploy_dir/console.conf" ]]; do
   if [[ $deploy_dir == / ]]; then
-    echo "no deployment directory (docker-compose.yml + pathfinder.service) at or above $script_dir" >&2
+    echo "no deployment directory (docker-compose.yml + console.conf) at or above $script_dir" >&2
     exit 1
   fi
   deploy_dir=$(dirname "$deploy_dir")
@@ -61,7 +59,6 @@ remote_dir=${shell_dir:-${PF_DEPLOY_DIR:-/opt/pathfinder/deployment}}
 key=${shell_key:-${PF_DEPLOY_KEY:-}}
 password=${shell_password:-${PF_DEPLOY_PASSWORD:-}}
 
-action=reload
 dry_run=0
 files=()
 
@@ -72,7 +69,7 @@ usage() {
 
 while [[ $# -gt 0 ]]; do
   case $1 in
-    --restart) action=restart ;;
+    --restart) echo "service actions are manual; see RUNBOOK.md" >&2; exit 2 ;;
     --dry-run) dry_run=1 ;;
     -h | --help) usage ;;
     -*) echo "unknown option: $1" >&2; usage ;;
@@ -122,7 +119,7 @@ login_hint() {
 }
 
 if [[ ${#files[@]} -eq 0 ]]; then
-  files=(docker-compose.yml Caddyfile pathfinder.service)
+  files=(docker-compose.yml console.conf)
 fi
 
 for file in "${files[@]}"; do
@@ -140,25 +137,13 @@ sftp_batch=$(
   done
 )
 
-unit_sent=0
-for file in "${files[@]}"; do
-  [[ $file == pathfinder.service ]] && unit_sent=1
-done
-
-# On the host: re-render the unit when it was sent (the committed file carries the canonical path), pull the
-# images the compose file now pins, then reload (or restart) the service and show what runs.
+# Validation never prints the rendered configuration, which contains secrets.
 remote_script=$(
   cat <<EOS
 set -euo pipefail
 cd '$remote_dir'
-if [[ $unit_sent -eq 1 ]]; then
-  sed "s#/opt/pathfinder/deployment#\$PWD#" pathfinder.service > /etc/systemd/system/pathfinder.service
-  systemctl daemon-reload
-  echo "unit re-rendered for \$PWD"
-fi
-docker compose pull --quiet
-systemctl $action pathfinder
-docker compose ps
+docker compose -p pathfinder -f docker-compose.yml config --quiet
+echo 'Files uploaded and Compose validated. Activation is a separate operator-controlled step.'
 EOS
 )
 
@@ -167,7 +152,7 @@ login_how="ssh agent / default keys"
 [[ -n $password ]] && login_how="password via sshpass"
 echo "target: $target (port $port, $login_how), dir: $remote_dir"
 echo "files:  ${files[*]}"
-echo "then:   docker compose pull; systemctl $action pathfinder"
+echo "then:   validate only; no pulls or service actions"
 
 if [[ $dry_run -eq 1 ]]; then
   echo

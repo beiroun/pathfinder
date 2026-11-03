@@ -5,6 +5,7 @@ deployment/.deploy.env
 .deploy.env
 .env
 .env.local
+deployment/console.conf
 
 # site-local operational scripts: real ports and addresses of one host, kept out of a public repo
 deployment/private/
